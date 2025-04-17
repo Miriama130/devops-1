@@ -93,17 +93,18 @@ public class ChambreService implements IChambreService {
         return c.getTypeC().equals(type) && c.getBloc().getFoyer().getNomFoyer().equals(nomFoyer);
     }
 
-    private boolean isChambreDisponible(Chambre c, LocalDate dateDebutAU, LocalDate dateFinAU) {
-        long numReservation = c.getReservations().stream()
-                .filter(r -> isReservationInAnneeUniversitaire(r, dateDebutAU, dateFinAU))
-                .count();
+private boolean isChambreDisponible(Chambre c, LocalDate dateDebutAU, LocalDate dateFinAU) {
+    long numReservation = c.getReservations().stream()
+            .filter(r -> isReservationInAnneeUniversitaire(r, dateDebutAU, dateFinAU))
+            .count();
 
-        return switch (c.getTypeC()) {
-            case SIMPLE -> numReservation == 0;
-            case DOUBLE -> numReservation < 2;
-            case TRIPLE -> numReservation < 3;
-        };
-    }
+    return switch (c.getTypeC()) {
+        case SIMPLE -> numReservation == 0;
+        case DOUBLE -> numReservation < 2;
+        case TRIPLE -> numReservation < 3;
+        default -> throw new IllegalStateException("Type de chambre non supporté: " + c.getTypeC());
+    };
+}
 
     private boolean isReservationInAnneeUniversitaire(Reservation r, LocalDate dateDebutAU, LocalDate dateFinAU) {
         return r.getAnneeUniversitaire().isBefore(dateFinAU) && r.getAnneeUniversitaire().isAfter(dateDebutAU);
