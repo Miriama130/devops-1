@@ -46,18 +46,50 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
-            steps {
+    steps {
+        script {
+            try {
+                // 1. Vérification préalable du serveur SonarQube
+                sh '''
+                    echo "Vérification de l'accessibilité de SonarQube..."
+                    if ! curl -sI ${SONARQUBE_URL} | grep -q "200 OK"; then
+                        echo "ERREUR: SonarQube inaccessible à ${SONARQUBE_URL}"
+                        exit 1
+                    fi
+                '''
+
+                // 2. Exécution de l'analyse avec timeout
                 withCredentials([string(credentialsId: 'sonarqubetoken', variable: 'SONAR_TOKEN')]) {
-                    sh '''
-                        mvn sonar:sonar \
-                        -Dsonar.projectKey=FoyerApp \
-                        -Dsonar.host.url=${SONARQUBE_URL} \
-                        -Dsonar.login=${SONAR_TOKEN}
-                    '''
+                    timeout(time: 15, unit: 'MINUTES') {
+                        sh '''
+                            echo "Début de l'analyse SonarQube..."
+                            mvn -B sonar:sonar \
+                                -Dsonar.projectKey=FoyerApp \
+                                -Dsonar.host.url=${SONARQUBE_URL} \
+                                -Dsonar.login=${SONAR_TOKEN} \
+                                -Dsonar.projectName="FoyerApp" \
+                                -Dsonar.sourceEncoding=UTF-8 \
+                                -Dsonar.java.binaries=target/classes \
+                                -Dsonar.qualitygate.wait=true
+                            
+                            echo "Analyse SonarQube terminée avec succès"
+                        '''
+                    }
                 }
+            } catch (Exception e) {
+                // 3. Gestion d'erreur détaillée
+                echo "ERREUR lors de l'analyse SonarQube: ${e.toString()}"
+                sh '''
+                    echo "Tentative de récupération des logs..."
+                    curl -v ${SONARQUBE_URL}/api/system/status
+                '''
+                currentBuild.result = 'UNSTABLE'
+                // Optionnel : continue le pipeline malgré l'échec
             }
         }
-
+    }
+}
+        
         stage('Deploy to Nexus') {
             steps {
                 script {
