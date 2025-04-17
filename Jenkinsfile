@@ -158,19 +158,15 @@ pipeline {
         }
     }
 
-    post {
-        always {
-            cleanWs()  // Nettoyage de l'espace de travail
-        }
+   post {
         success {
-            mail to: 'mariemtlili1999@gmail.com',
-                subject: "SUCCESS: ${JOB_NAME} - Build #${BUILD_NUMBER}",
-                body: "Build successful\n${BUILD_URL}"
+            echo "Pipeline executed successfully!"
+            echo "Artifacts deployed to Nexus: ${NEXUS_URL}"
+            echo "Docker Image: ${DOCKER_IMAGE}:${DOCKER_TAG}"
+            echo "Application deployed at: http://172.20.99.98:8082/Foyer"
         }
         failure {
-            mail to: 'mariemtlili1999@gmail.com',
-                subject: "FAILED: ${JOB_NAME} - Build #${BUILD_NUMBER}",
-                body: "Build failed\n${BUILD_URL}\n\nConsultez les logs pour plus de détails."
+            echo "Pipeline failed. Check the logs for errors."
         }
     }
 }
