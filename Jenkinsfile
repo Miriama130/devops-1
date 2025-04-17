@@ -104,115 +104,73 @@ pipeline {
 
 
         stage('Prepare Docker Artifacts') {
-    steps {
-        script {
-            // Vérification explicite du fichier JAR
-            def jarFiles = findFiles(glob: 'target/Foyer-*.jar')
-            if (jarFiles.isEmpty()) {
-                error("Aucun fichier JAR trouvé dans target/")
-            }
-            
-            // Utilisation du dernier fichier JAR généré
-            def jarFile = jarFiles.last().path
-            echo "Fichier JAR utilisé : ${jarFile}"
-            
-            // Copie avec vérification
-            sh """
-                cp -v ${jarFile} target/Foyer-0.0.1.jar || exit 1
-                ls -lh target/Foyer-*.jar
-                [ -f target/Foyer-0.0.1.jar ] || exit 1
-            """
-        }
-    }
-}
-
-stage('Build Docker Image') {
-    environment {
-        DOCKER_BUILDKIT = "1"  # Active les fonctionnalités modernes de Docker
-    }
-    steps {
-        script {
-            // Build avec cache et sortie détaillée
-            sh """
-                docker build \
-                    --progress=plain \
-                    --no-cache \
-                    -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
-            """
-            
-            // Vérification de l'image
-            sh """
-                docker image inspect ${DOCKER_IMAGE}:${DOCKER_TAG} >/dev/null
-                docker images --filter=reference="${DOCKER_IMAGE}:${DOCKER_TAG}"
-            """
-        }
-    }
-}
-
-stage('Push to Docker Hub') {
-    steps {
-        withCredentials([usernamePassword(
-            credentialsId: 'dockercredentials', 
-            usernameVariable: 'DOCKER_USERNAME', 
-            passwordVariable: 'DOCKER_PASSWORD'
-        )]) {
-            script {
-                // Login avec timeout
-                sh """
-                    set +x  # Désactive l'affichage des commandes
-                    echo ${DOCKER_PASSWORD} | \
-                    timeout 60 docker login \
-                        -u ${DOCKER_USERNAME} \
-                        --password-stdin || exit 1
-                    set -x
-                """
-                
-                // Push avec retry en cas d'échec réseau
-                retry(3) {
-                    timeout(time: 5, unit: 'MINUTES') {
-                        sh """
-                            docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
-                        """
-                    }
+            steps {
+                script {
+                    def jarFile = "target/${ARTIFACT_NAME}-${ARTIFACT_VERSION}.jar"
+                    sh """
+                        [ -f ${jarFile} ] || exit 1
+                        cp -v ${jarFile} target/Foyer-0.0.1.jar
+                        ls -lh target/
+                    """
                 }
-                
-                // Nettoyage sécurisé
+            }
+        }
+
+        stage('Build Docker Image') {
+            environment {
+                DOCKER_BUILDKIT = "1"
+            }
+            steps {
                 sh """
-                    docker logout
-                    unset DOCKER_USERNAME
-                    unset DOCKER_PASSWORD
+                    docker build \
+                        --progress=plain \
+                        -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                    docker images | grep ${DOCKER_IMAGE}
+                """
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockercredentials', 
+                    usernameVariable: 'DOCKER_USERNAME', 
+                    passwordVariable: 'DOCKER_PASSWORD'
+                )]) {
+                    sh """
+                        set +x
+                        echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin
+                        set -x
+                        docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+                        docker logout
+                    """
+                }
+            }
+        }
+
+        stage('Deploy Application') {
+            steps {
+                sh """
+                    docker-compose -f docker-compose.yml down || true
+                    docker-compose -f docker-compose.yml up -d
                 """
             }
         }
     }
-}
-
-stage('Prepare Ports') {
-    steps {
-        script {
-            // Nettoyage des containers existants
-            sh '''
-                docker-compose -f docker-compose.yml down || true
-                docker stop ${DOCKER_IMAGE} || true
-                docker rm ${DOCKER_IMAGE} || true
-                
-                # Nettoyage des volumes
-                docker volume rm dockerimage_mysql_data || true
-                docker volume prune -f || true
-            '''
-        }
-    }
-}
 
     post {
+        always {
+            cleanWs()  // Nettoyage de l'espace de travail
+        }
         success {
-            echo "Pipeline executed successfully!"
-            echo "Artifacts deployed to Nexus: ${NEXUS_URL}"
-            echo "Docker Image: ${DOCKER_IMAGE}:${DOCKER_TAG}"
-            echo "Application deployed at: http://172.20.99.98:8082/Foyer"
+            mail to: 'mariemtlili1999@gmail.com',
+                subject: "SUCCESS: ${JOB_NAME} - Build #${BUILD_NUMBER}",
+                body: "Build successful\n${BUILD_URL}"
         }
         failure {
-            echo "Pipeline failed. Check the logs for errors."
+            mail to: 'mariemtlili1999@gmail.com',
+                subject: "FAILED: ${JOB_NAME} - Build #${BUILD_NUMBER}",
+                body: "Build failed\n${BUILD_URL}\n\nConsultez les logs pour plus de détails."
         }
     }
 }
