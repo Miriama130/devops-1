@@ -46,18 +46,17 @@ pipeline {
         }
 
      stage('SonarQube Analysis') {
-    steps {
-        withCredentials([string(credentialsId: 'sonarqubetoken', variable: 'SONAR_TOKEN')]) {
-            sh '''
-                mvn -B sonar:sonar \
-                    -Dsonar.projectKey=FoyerApp \
-                    -Dsonar.host.url=${SONARQUBE_URL} \
-                    -Dsonar.login=${SONAR_TOKEN} \
-                    -Dsonar.qualitygate.wait=true
-            '''
+            steps {
+                withCredentials([string(credentialsId: 'sonarqubetoken', variable: 'SONAR_TOKEN')]) {
+                    sh '''
+                        mvn sonar:sonar \
+                        -Dsonar.projectKey=FoyerApp \
+                        -Dsonar.host.url=${SONARQUBE_URL} \
+                        -Dsonar.login=${SONAR_TOKEN}
+                    '''
+                }
+            }
         }
-    }
-}
         
       stage('Deploy to Nexus') {
     steps {
