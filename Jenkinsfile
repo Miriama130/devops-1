@@ -101,44 +101,108 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    sh 'ls -l target/*.jar'
-                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
-                    sh 'docker images | grep ${DOCKER_IMAGE}'
-                }
-            }
-        }
 
-        stage('Push to Docker Hub') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockercredentials', 
-                    usernameVariable: 'DOCKER_USERNAME', 
-                    passwordVariable: 'DOCKER_PASSWORD'  
-                )]) {
-                    sh "echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin"
-                    sh "docker push ${DOCKER_IMAGE}:${DOCKER_TAG}"
-                    sh "docker logout"
-                }
-            }
-        }
 
-        stage('Prepare Ports') {
-            steps {
-                script {
-                    // Just ensure no containers are using the ports
-                    sh 'docker-compose -f docker-compose.yml down || true'
-                    
-                    // Clean up any existing volumes if needed
-                    sh 'docker volume rm dockerimage_mysql_data || true'
-                }
+        stage('Prepare Docker Artifacts') {
+    steps {
+        script {
+            // Vérification explicite du fichier JAR
+            def jarFiles = findFiles(glob: 'target/Foyer-*.jar')
+            if (jarFiles.isEmpty()) {
+                error("Aucun fichier JAR trouvé dans target/")
             }
+            
+            // Utilisation du dernier fichier JAR généré
+            def jarFile = jarFiles.last().path
+            echo "Fichier JAR utilisé : ${jarFile}"
+            
+            // Copie avec vérification
+            sh """
+                cp -v ${jarFile} target/Foyer-0.0.1.jar || exit 1
+                ls -lh target/Foyer-*.jar
+                [ -f target/Foyer-0.0.1.jar ] || exit 1
+            """
         }
-
-       
     }
+}
+
+stage('Build Docker Image') {
+    environment {
+        DOCKER_BUILDKIT = "1"  # Active les fonctionnalités modernes de Docker
+    }
+    steps {
+        script {
+            // Build avec cache et sortie détaillée
+            sh """
+                docker build \
+                    --progress=plain \
+                    --no-cache \
+                    -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+            """
+            
+            // Vérification de l'image
+            sh """
+                docker image inspect ${DOCKER_IMAGE}:${DOCKER_TAG} >/dev/null
+                docker images --filter=reference="${DOCKER_IMAGE}:${DOCKER_TAG}"
+            """
+        }
+    }
+}
+
+stage('Push to Docker Hub') {
+    steps {
+        withCredentials([usernamePassword(
+            credentialsId: 'dockercredentials', 
+            usernameVariable: 'DOCKER_USERNAME', 
+            passwordVariable: 'DOCKER_PASSWORD'
+        )]) {
+            script {
+                // Login avec timeout
+                sh """
+                    set +x  # Désactive l'affichage des commandes
+                    echo ${DOCKER_PASSWORD} | \
+                    timeout 60 docker login \
+                        -u ${DOCKER_USERNAME} \
+                        --password-stdin || exit 1
+                    set -x
+                """
+                
+                // Push avec retry en cas d'échec réseau
+                retry(3) {
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh """
+                            docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+                        """
+                    }
+                }
+                
+                // Nettoyage sécurisé
+                sh """
+                    docker logout
+                    unset DOCKER_USERNAME
+                    unset DOCKER_PASSWORD
+                """
+            }
+        }
+    }
+}
+
+stage('Prepare Ports') {
+    steps {
+        script {
+            // Nettoyage des containers existants
+            sh '''
+                docker-compose -f docker-compose.yml down || true
+                docker stop ${DOCKER_IMAGE} || true
+                docker rm ${DOCKER_IMAGE} || true
+                
+                # Nettoyage des volumes
+                docker volume rm dockerimage_mysql_data || true
+                docker volume prune -f || true
+            '''
+        }
+    }
+}
 
     post {
         success {
