@@ -59,25 +59,27 @@ pipeline {
     }
 }
         
-       stage('Deploy to Nexus') {
-            steps {
-                script {
-                    withCredentials([usernamePassword(
-                        credentialsId: 'nexus',
-                        usernameVariable: 'NEXUS_USER',
-                        passwordVariable: 'NEXUS_PASS'
-                    )]) {
-                        sh '''
-                            # Convertir SNAPSHOT en RELEASE
-                            mvn versions:set -DnewVersion=0.0.1
-                            mvn -B deploy \
-                                -DaltDeploymentRepository=nexus-releases::default::${NEXUS_URL}/repository/maven-releases/ \
-                                -s settings.xml
-                        '''
-                    }
-                }
+      stage('Deploy to Nexus') {
+    steps {
+        script {
+            withCredentials([usernamePassword(
+                credentialsId: 'nexus',
+                usernameVariable: 'NEXUS_USER',
+                passwordVariable: 'NEXUS_PASS'
+            )]) {
+                sh '''
+                    # Conversion de version
+                    mvn versions:set -DnewVersion=${ARTIFACT_VERSION}
+                    
+                    # Déploiement avec settings.xml existant
+                    mvn -B deploy \
+                        -DaltDeploymentRepository=nexus-releases::default::${NEXUS_URL}${NEXUS_REPO_PATH} \
+                        -s settings.xml
+                '''
             }
         }
+    }
+}
 
         stage('Download Artifact from Nexus') {
             steps {
