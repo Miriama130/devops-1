@@ -14,9 +14,9 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'Mariemtl-clean',
+                git branch: 'mariem-tlili',
                     credentialsId: 'TOKEN',
-                    url: 'https://github.com/Miriama130/devops.git'
+                    url: 'https://github.com/Miriama130/devops-1.git'
             }
 }
 
