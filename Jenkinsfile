@@ -12,25 +12,13 @@ pipeline {
     }
 
     stages {
-        stage('Nettoyage') {
+        stage('Checkout Code') {
             steps {
-                cleanWs()  // Nettoie l'espace de travail
-                sh 'git config --global http.postBuffer 524288000'  // Augmente le buffer
+                git branch: 'mariem-tlili',
+                    credentialsId: 'TOKEN',
+                    url: 'https://github.com/Miriama130/devops-1.git'
             }
-        }
-        stage('Checkout') {
-            steps {
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: '*/main']],
-                    extensions: [[$class: 'CleanBeforeCheckout']],
-                    userRemoteConfigs: [[
-                        url: 'https://github.com/Miriama130/devops-1',
-                        credentialsId: 'VOTRE_ID_CREDENTIALS'
-                    ]]
-                ])
-            }
-        }
+}
     
         stage('Clean Docker Environment') {
     steps {
