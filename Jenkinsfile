@@ -9,6 +9,7 @@ pipeline {
         ARTIFACT_VERSION = "0.0.1-${BUILD_NUMBER}"
         ARTIFACT_NAME = 'Foyer'
         ARTIFACT_PATH = "tn/esprit/spring/${ARTIFACT_NAME}/${ARTIFACT_VERSION}/${ARTIFACT_NAME}-${ARTIFACT_VERSION}.jar"
+        EMAIL_CREDENTIALS = credentials('email') // ID du credential
     }
 
     stages {
@@ -155,6 +156,27 @@ pipeline {
                 """
             }
         }
+    
+
+
+        stage('Send Email') {
+            steps {
+                script {
+                    emailext (
+                        subject: "✅ Build Réussi : ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                        body: """
+                            <p>Bonjour,</p>
+                            <p>Le build du job <strong>${env.JOB_NAME}</strong> a réussi 🎉</p>
+                            <p>Voir les détails ici : <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                        """,
+                        mimeType: 'text/html',
+                        to: 'mariemtlili1999@gmail.com',
+                        from: "${EMAIL_CREDENTIALS_USR}",
+                        replyTo: "${EMAIL_CREDENTIALS_USR}"
+                    )
+                }
+            }
+        }
     }
 
    post {
@@ -164,8 +186,10 @@ pipeline {
             echo "Docker Image: ${DOCKER_IMAGE}:${DOCKER_TAG}"
             echo "Application deployed at: http://172.20.99.98:8082/Foyer"
         }
+
         failure {
             echo "Pipeline failed. Check the logs for errors."
         }
     }
+
 }
