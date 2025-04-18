@@ -79,7 +79,7 @@ pipeline {
                         mvn sonar:sonar \
                         -Dsonar.projectKey=FoyerApp \
                         -Dsonar.host.url=${SONARQUBE_URL} \
-                        -Dsonar.login=${SONAR_TOKEN}
+                        -Dsonar.login=${SONAR_TOKEN} \
                         -Dsonar.jacoco.reportPaths=target/jacoco.exec
 
                     '''
