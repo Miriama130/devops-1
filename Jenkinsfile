@@ -44,6 +44,19 @@ pipeline {
             steps {
                 sh 'mvn clean package'
             }
+             post {
+                always {
+                    jacoco(
+                        execPattern: 'target/jacoco.exec',
+                        classPattern: 'target/classes',
+                        sourcePattern: 'src/main/java',
+                        exclusionPattern: 'src/test*',
+                        changeBuildStatus: true,
+                        minimumInstructionCoverage: '70',
+                        maximumInstructionCoverage: '80'
+                    )
+                }
+            }
         }
 
      stage('SonarQube Analysis') {
