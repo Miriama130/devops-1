@@ -200,6 +200,7 @@ pipeline {
             echo "Artifacts deployed to Nexus: ${NEXUS_URL}"
             echo "Docker Image: ${DOCKER_IMAGE}:${DOCKER_TAG}"
             echo "Application deployed at: http://172.20.99.98:8082/Foyer"
+            archiveArtifacts artifacts: 'target/site/jacoco/**'
         }
 
         failure {
