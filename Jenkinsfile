@@ -54,7 +54,8 @@ pipeline {
                 changeBuildStatus: false,  
                 minimumInstructionCoverage: '0',  
                 maximumInstructionCoverage: '100'
-                    )
+             )
+            junit '**/target/surefire-reports/*.xml'
                 }
             }
         }
