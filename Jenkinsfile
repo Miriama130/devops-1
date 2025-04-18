@@ -44,21 +44,33 @@ pipeline {
             steps {
                 sh 'mvn clean package'
             }
-             post {
-                always {
-                    jacoco(
-                        execPattern: 'target/jacoco.exec',
-                classPattern: 'target/classes',
-                sourcePattern: 'src/main/java',
-                exclusionPattern: 'src/test*',
-                changeBuildStatus: false,  
-                minimumInstructionCoverage: '0',  
-                maximumInstructionCoverage: '100'
-             )
-            junit '**/target/surefire-reports/*.xml'
-                }
-            }
         }
+
+     stage('JaCoCo Report') {
+            steps {
+                echo 'Generating JaCoCo coverage report...'
+                sh 'mvn jacoco:report'
+                junit '**/target/surefire-reports/*.xml'
+                
+                jacoco(
+                    execPattern: '**/target/jacoco.exec',
+                    classPattern: '**/target/classes',
+                    sourcePattern: '**/src/main/java',
+                    exclusionPattern: '**/src/test/*',
+                    changeBuildStatus: true,
+                    skipCopyOfSrcFiles: false
+                )
+                
+                publishHTML(target: [
+                    allowMissing: false,
+                    alwaysLinkToLastBuild: false,
+                    keepAll: true,
+                    reportDir: 'target/site/jacoco',
+                    reportFiles: 'index.html',
+                    reportName: 'JaCoCo Report'
+                ])
+            }
+        }   
 
      stage('SonarQube Analysis') {
             steps {
@@ -201,7 +213,6 @@ pipeline {
             echo "Artifacts deployed to Nexus: ${NEXUS_URL}"
             echo "Docker Image: ${DOCKER_IMAGE}:${DOCKER_TAG}"
             echo "Application deployed at: http://172.20.99.98:8082/Foyer"
-            archiveArtifacts artifacts: 'target/site/jacoco/**'
         }
 
         failure {
